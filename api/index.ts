@@ -17,7 +17,7 @@ async function createApp() {
   const app = await NestFactory.create(AppModule, adapter);
   
   // Enable CORS - Update with your Netlify frontend URL
-  const frontendUrl = process.env.FRONTEND_URL || 'https://your-netlify-app.netlify.app';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://jaaymaa-app.netlify.app';
   app.enableCors({
     origin: [
       frontendUrl,
