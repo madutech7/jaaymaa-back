@@ -62,7 +62,56 @@ async function createApp() {
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    
+    // Configure Swagger to use CDN for static assets (required for Vercel serverless)
+    // Create custom HTML template that uses CDN
+    const customSwaggerHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SHOPLUX API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css" />
+  <style>
+    .swagger-ui .topbar { display: none }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: window.location.origin + '/api/docs-json',
+        dom_id: '#swagger-ui',
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "StandaloneLayout",
+        deepLinking: true,
+        persistAuthorization: true,
+        displayRequestDuration: true
+      });
+    };
+  </script>
+</body>
+</html>
+    `;
+    
+    // Setup Swagger - this creates the /api/docs-json endpoint
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'SHOPLUX API Documentation',
+      customCss: '.swagger-ui .topbar { display: none }',
+      customJs: [],
+    });
+    
+    // Override the Swagger HTML route AFTER setup to use our custom template with CDN
+    const httpAdapter = app.getHttpAdapter();
+    httpAdapter.get('/api/docs', (req: any, res: any) => {
+      res.setHeader('Content-Type', 'text/html');
+      res.send(customSwaggerHtml);
+    });
 
     await app.init();
     cachedApp = expressApp;
