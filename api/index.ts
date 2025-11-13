@@ -1,8 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-import * as express from 'express';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+// Use require for express to ensure compatibility with Vercel serverless functions
+const express = require('express');
 
 let cachedApp: any;
 
@@ -49,6 +52,17 @@ async function createApp() {
 
     // API prefix
     app.setGlobalPrefix('api');
+
+    // Swagger documentation
+    const config = new DocumentBuilder()
+      .setTitle('SHOPLUX API')
+      .setDescription('E-commerce platform API documentation')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
 
     await app.init();
     cachedApp = expressApp;
