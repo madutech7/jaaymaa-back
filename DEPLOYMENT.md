@@ -33,19 +33,29 @@ Dans les paramètres du projet Vercel :
 
 ### 4. Variables d'Environnement
 
-Dans les paramètres du projet Vercel, ajoutez toutes les variables d'environnement nécessaires :
+Dans les paramètres du projet Vercel, ajoutez **UNIQUEMENT** les variables d'environnement suivantes :
+
+**Variables OBLIGATOIRES :**
 
 ```
 DATABASE_URL=your_postgresql_connection_string
 JWT_SECRET=your_jwt_secret
-JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://your-netlify-app.netlify.app
+```
+
+**Variables OPTIONNELLES (si vous utilisez Google OAuth) :**
+
+```
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_CALLBACK_URL=https://your-vercel-app.vercel.app/api/auth/google/callback
-PORT=3000
-NODE_ENV=production
 ```
+
+**Variables à NE PAS ajouter (gérées automatiquement par Vercel) :**
+
+- ❌ `PORT` - Vercel gère le port automatiquement
+- ❌ `NODE_ENV` - Vercel définit automatiquement `production` en production
+- ❌ `JWT_EXPIRES_IN` - Optionnel, valeur par défaut utilisée si non défini
 
 ### 5. Important : Mettre à jour Google OAuth
 
@@ -96,3 +106,26 @@ Une fois déployé, testez l'API :
 
 - Vérifiez que `DATABASE_URL` est correct
 - Vérifiez que votre base de données accepte les connexions externes
+
+### Erreur 500 (INTERNAL_SERVER_ERROR)
+
+Si vous voyez une erreur 500 sur Vercel :
+
+1. **Vérifiez les logs Vercel** :
+   - Allez dans votre projet Vercel
+   - Cliquez sur "Functions" dans le menu
+   - Ouvrez les logs pour voir l'erreur exacte
+
+2. **Vérifiez les variables d'environnement** :
+   - Allez dans "Settings" > "Environment Variables"
+   - Assurez-vous que `DATABASE_URL` et `JWT_SECRET` sont définis
+   - Les logs afficheront maintenant quelles variables manquent
+
+3. **Erreurs courantes** :
+   - `DATABASE_URL` manquant ou incorrect → Vérifiez votre chaîne de connexion PostgreSQL
+   - `JWT_SECRET` manquant → Ajoutez une valeur secrète aléatoire
+   - Timeout de connexion à la base de données → Vérifiez que votre base de données accepte les connexions externes (whitelist IP si nécessaire)
+
+4. **Testez localement** :
+   - Copiez les variables d'environnement dans un fichier `.env`
+   - Testez avec `npm run start:prod` pour reproduire l'erreur
