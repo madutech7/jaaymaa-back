@@ -13,6 +13,7 @@ Backend API for SHOPLUX e-commerce platform built with NestJS and PostgreSQL (Ne
 - 🎯 Row Level Security (RLS)
 - 📊 Analytics Views
 - 🛒 Complete E-commerce Features
+- 📧 Email confirmation for orders
 
 ## Prerequisites
 
@@ -34,6 +35,24 @@ npm install
    - `DATABASE_URL`: Your Neon PostgreSQL connection string
    - `JWT_SECRET`: A secure random string
    - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: Google OAuth credentials
+   - `EMAIL_USER`: Email address for sending emails (default: madutech@gmail.com)
+   - `EMAIL_PASSWORD`: Gmail application password (not your regular password)
+   
+### Email Configuration (Gmail)
+
+Pour configurer l'envoi d'emails avec Gmail:
+
+1. Activez la validation en 2 étapes sur votre compte Google
+2. Générez un mot de passe d'application:
+   - Allez sur https://myaccount.google.com/apppasswords
+   - Sélectionnez "Mail" et "Autre (nom personnalisé)"
+   - Entrez "JAAYMA" comme nom
+   - Copiez le mot de passe généré (16 caractères)
+3. Ajoutez dans votre fichier `.env`:
+   ```
+   EMAIL_USER=madutech@gmail.com
+   EMAIL_PASSWORD=votre_mot_de_passe_application
+   ```
 
 ## Database Setup
 
@@ -72,6 +91,7 @@ src/
 ├── coupons/        # Discount coupons
 ├── notifications/  # User notifications
 ├── support/        # Customer support
+├── email/          # Email service (order confirmations)
 ├── config/         # Configuration
 ├── common/         # Shared utilities
 └── main.ts         # Application entry point

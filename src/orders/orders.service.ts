@@ -1,15 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { EmailService } from '../email/email.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order)
     private ordersRepository: Repository<Order>,
+    private emailService: EmailService,
+    private usersService: UsersService,
   ) {}
 
   async create(createOrderDto: CreateOrderDto, userId: string): Promise<Order> {
@@ -22,7 +28,31 @@ export class OrdersService {
       order_number: orderNumber,
     });
 
-    return await this.ordersRepository.save(order);
+    const savedOrder = await this.ordersRepository.save(order);
+
+    // Envoyer l'email de confirmation de commande
+    try {
+      const user = await this.usersService.findOne(userId);
+      if (user && user.email) {
+        const userName = user.first_name && user.last_name 
+          ? `${user.first_name} ${user.last_name}` 
+          : user.first_name || user.last_name || undefined;
+        
+        await this.emailService.sendOrderConfirmation(
+          savedOrder,
+          user.email,
+          userName,
+        );
+        this.logger.log(`Email de confirmation envoyé pour la commande ${savedOrder.order_number}`);
+      } else {
+        this.logger.warn(`Impossible d'envoyer l'email: utilisateur ${userId} non trouvé ou sans email`);
+      }
+    } catch (error) {
+      // Ne pas faire échouer la création de commande si l'email échoue
+      this.logger.error(`Erreur lors de l'envoi de l'email de confirmation:`, error);
+    }
+
+    return savedOrder;
   }
 
   async findAll(userId?: string): Promise<Order[]> {
