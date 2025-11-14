@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
+import { ProductRecommendation } from './entities/product-recommendation.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -10,6 +11,8 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
+    @InjectRepository(ProductRecommendation)
+    private recommendationsRepository: Repository<ProductRecommendation>,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
@@ -290,6 +293,61 @@ export class ProductsService {
     // Handle different possible result formats
     const count = result ? (parseInt(result.count, 10) || parseInt(result.COUNT, 10) || 0) : 0;
     return count;
+  }
+
+  /**
+   * Get product recommendations
+   * Returns recommended products based on the recommendation table or similar products
+   */
+  async getRecommendations(
+    productId: string,
+    type?: 'similar' | 'frequently_bought' | 'alternative',
+    limit: number = 8
+  ): Promise<Product[]> {
+    // First, try to get recommendations from the recommendations table
+    const queryBuilder = this.recommendationsRepository
+      .createQueryBuilder('rec')
+      .leftJoinAndSelect('rec.recommended_product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('rec.product_id = :productId', { productId })
+      .andWhere('product.status = :status', { status: 'active' });
+
+    if (type) {
+      queryBuilder.andWhere('rec.type = :type', { type });
+    }
+
+    queryBuilder
+      .orderBy('rec.score', 'DESC')
+      .addOrderBy('rec.created_at', 'DESC')
+      .limit(limit);
+
+    const recommendations = await queryBuilder.getMany();
+
+    // If we have recommendations from the table, return them
+    if (recommendations.length > 0) {
+      return recommendations.map(rec => rec.recommended_product);
+    }
+
+    // Otherwise, fallback to similar products from the same category
+    const product = await this.findOne(productId);
+    if (!product || !product.category_id) {
+      return [];
+    }
+
+    // Get similar products from the same category
+    const similarProducts = await this.productsRepository.find({
+      where: {
+        category_id: product.category_id,
+        status: 'active',
+      },
+      relations: ['category'],
+      take: limit + 1, // +1 to exclude the current product
+    });
+
+    // Filter out the current product and return
+    return similarProducts
+      .filter(p => p.id !== productId)
+      .slice(0, limit);
   }
 }
 

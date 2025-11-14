@@ -114,6 +114,18 @@ export class ProductsController {
     return this.productsService.findBySlug(slug);
   }
 
+  @Get(':id/recommendations')
+  @ApiOperation({ summary: 'Get product recommendations' })
+  @ApiQuery({ name: 'type', required: false, enum: ['similar', 'frequently_bought', 'alternative'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getRecommendations(
+    @Param('id') id: string,
+    @Query('type') type?: 'similar' | 'frequently_bought' | 'alternative',
+    @Query('limit') limit?: number,
+  ) {
+    return this.productsService.getRecommendations(id, type, limit ? parseInt(limit.toString()) : 8);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get product by ID' })
   findOne(@Param('id') id: string) {

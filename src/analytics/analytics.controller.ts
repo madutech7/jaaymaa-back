@@ -32,6 +32,12 @@ export class AnalyticsController {
     return this.analyticsService.getMostViewedProducts(limit ? parseInt(limit.toString()) : 10);
   }
 
+  @Post('abandoned-carts')
+  @ApiOperation({ summary: 'Track abandoned cart' })
+  trackAbandonedCart(@Body() data: any) {
+    return this.analyticsService.trackAbandonedCart(data);
+  }
+
   @Get('abandoned-carts')
   @ApiOperation({ summary: 'Get abandoned carts (Admin only)' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
