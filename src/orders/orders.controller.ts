@@ -28,7 +28,7 @@ export class OrdersController {
   @Post()
   @ApiOperation({ summary: 'Create new order' })
   create(@Body() createOrderDto: CreateOrderDto, @CurrentUser() user: User) {
-    return this.ordersService.create(createOrderDto, user.id);
+    return this.ordersService.create(createOrderDto, user);
   }
 
   @Get()

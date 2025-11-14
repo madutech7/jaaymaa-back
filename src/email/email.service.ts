@@ -10,20 +10,28 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     // Configuration Gmail avec mot de passe d'application
+    const emailUser = this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com';
+    const emailPassword = this.configService.get<string>('EMAIL_PASSWORD');
+
+    if (!emailPassword) {
+      this.logger.warn('⚠️ EMAIL_PASSWORD non configuré dans les variables d\'environnement');
+    }
+
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com',
-        pass: this.configService.get<string>('EMAIL_PASSWORD'), // Mot de passe d'application 
+        user: emailUser,
+        pass: emailPassword, // Mot de passe d'application 
       },
     });
 
     // Vérifier la configuration
     this.transporter.verify((error, success) => {
       if (error) {
-        this.logger.error('Erreur de configuration email:', error);
+        this.logger.error('❌ Erreur de configuration email:', error);
+        this.logger.error('Vérifiez que EMAIL_USER et EMAIL_PASSWORD sont correctement configurés dans .env');
       } else {
-        this.logger.log('✅ Configuration email réussie');
+        this.logger.log(`✅ Configuration email réussie - Envoi depuis: ${emailUser}`);
       }
     });
   }
@@ -186,11 +194,21 @@ L'équipe JAAYMA
         html: htmlContent,
       };
 
+      this.logger.log(`📧 Envoi de l'email de confirmation à ${userEmail}...`);
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email de confirmation envoyé à ${userEmail} pour la commande ${order.order_number}`);
+      this.logger.log(`✅ Email de confirmation envoyé avec succès à ${userEmail} pour la commande ${order.order_number}`);
       this.logger.debug(`Message ID: ${info.messageId}`);
     } catch (error) {
-      this.logger.error(`Erreur lors de l'envoi de l'email de confirmation:`, error);
+      this.logger.error(`❌ Erreur lors de l'envoi de l'email de confirmation à ${userEmail}:`, error);
+      if (error instanceof Error) {
+        this.logger.error(`Détails: ${error.message}`);
+        // Erreurs Gmail communes
+        if (error.message.includes('Invalid login')) {
+          this.logger.error('Vérifiez que le mot de passe d\'application Gmail est correct');
+        } else if (error.message.includes('Connection timeout')) {
+          this.logger.error('Problème de connexion réseau ou Gmail bloqué');
+        }
+      }
       // Ne pas faire échouer la création de commande si l'email échoue
       throw error;
     }

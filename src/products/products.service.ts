@@ -414,7 +414,7 @@ export class ProductsService {
     let quantityBefore = 0;
     if (logData.product_id) {
       const product = await this.productsRepository.findOne({ where: { id: logData.product_id } });
-      quantityBefore = product?.stock_quantity || 0;
+      quantityBefore = product?.stock || 0;
     } else if (logData.variant_id) {
       // Note: You may need to add variant repository if not already available
       // For now, we'll set quantity before to 0 if variant-based
