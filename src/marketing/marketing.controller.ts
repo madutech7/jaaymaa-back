@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Delete, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Delete, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MarketingService } from './marketing.service';
@@ -40,12 +40,77 @@ export class MarketingController {
   }
 
   @Get('templates')
-  @ApiOperation({ summary: 'Get email templates (Admin only)' })
+  @ApiOperation({ summary: 'Get all email templates (Admin only)' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   findAllTemplates() {
     return this.marketingService.findAllTemplates();
+  }
+
+  @Get('templates/:id')
+  @ApiOperation({ summary: 'Get email template by ID (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  findOneTemplate(@Param('id') id: string) {
+    return this.marketingService.findOneTemplate(id);
+  }
+
+  @Post('templates')
+  @ApiOperation({ summary: 'Create email template (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  createTemplate(@Body() templateData: {
+    name: string;
+    subject: string;
+    body_html: string;
+    body_text?: string;
+    variables?: string[];
+    is_active?: boolean;
+  }) {
+    return this.marketingService.createTemplate(templateData);
+  }
+
+  @Patch('templates/:id')
+  @ApiOperation({ summary: 'Update email template (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  updateTemplate(
+    @Param('id') id: string,
+    @Body() updates: {
+      subject?: string;
+      body_html?: string;
+      body_text?: string;
+      variables?: string[];
+      is_active?: boolean;
+    }
+  ) {
+    return this.marketingService.updateTemplate(id, updates);
+  }
+
+  @Delete('templates/:id')
+  @ApiOperation({ summary: 'Delete email template (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  async deleteTemplate(@Param('id') id: string) {
+    await this.marketingService.deleteTemplate(id);
+    return { message: 'Template deleted successfully' };
+  }
+
+  @Post('templates/:id/render')
+  @ApiOperation({ summary: 'Render email template with variables (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  renderTemplate(
+    @Param('id') id: string,
+    @Body('variables') variables: Record<string, string>
+  ) {
+    return this.marketingService.renderTemplate(id, variables || {});
   }
 }
 

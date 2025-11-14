@@ -18,7 +18,99 @@ export class MarketingService {
 
   // Email Templates
   async findAllTemplates(): Promise<EmailTemplate[]> {
-    return await this.templatesRepository.find({ where: { is_active: true } });
+    // Return all templates for admin (not just active)
+    return await this.templatesRepository.find({ order: { created_at: 'DESC' } });
+  }
+
+  async findOneTemplate(id: string): Promise<EmailTemplate> {
+    const template = await this.templatesRepository.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException(`Email template with ID ${id} not found`);
+    }
+    return template;
+  }
+
+  async findTemplateByName(name: string): Promise<EmailTemplate | null> {
+    return await this.templatesRepository.findOne({ where: { name } });
+  }
+
+  async createTemplate(templateData: {
+    name: string;
+    subject: string;
+    body_html: string;
+    body_text?: string;
+    variables?: string[];
+    is_active?: boolean;
+  }): Promise<EmailTemplate> {
+    // Check if template name already exists
+    const existing = await this.findTemplateByName(templateData.name);
+    if (existing) {
+      throw new BadRequestException(`Template with name "${templateData.name}" already exists`);
+    }
+
+    const template = this.templatesRepository.create({
+      name: templateData.name,
+      subject: templateData.subject,
+      body_html: templateData.body_html,
+      body_text: templateData.body_text || null,
+      variables: templateData.variables || [],
+      is_active: templateData.is_active !== false,
+    });
+
+    return await this.templatesRepository.save(template);
+  }
+
+  async updateTemplate(
+    id: string,
+    updates: {
+      subject?: string;
+      body_html?: string;
+      body_text?: string;
+      variables?: string[];
+      is_active?: boolean;
+    }
+  ): Promise<EmailTemplate> {
+    const template = await this.findOneTemplate(id);
+
+    if (updates.subject !== undefined) template.subject = updates.subject;
+    if (updates.body_html !== undefined) template.body_html = updates.body_html;
+    if (updates.body_text !== undefined) template.body_text = updates.body_text;
+    if (updates.variables !== undefined) template.variables = updates.variables;
+    if (updates.is_active !== undefined) template.is_active = updates.is_active;
+
+    return await this.templatesRepository.save(template);
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    const template = await this.findOneTemplate(id);
+    await this.templatesRepository.remove(template);
+  }
+
+  async renderTemplate(
+    id: string,
+    variables: Record<string, string>
+  ): Promise<{ subject: string; body_html: string; body_text?: string }> {
+    const template = await this.findOneTemplate(id);
+
+    let subject = template.subject;
+    let bodyHtml = template.body_html;
+    let bodyText = template.body_text;
+
+    // Replace variables in template
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      subject = subject.replace(regex, value);
+      bodyHtml = bodyHtml.replace(regex, value);
+      if (bodyText) {
+        bodyText = bodyText.replace(regex, value);
+      }
+    });
+
+    return {
+      subject,
+      body_html: bodyHtml,
+      body_text: bodyText || undefined,
+    };
   }
 
   // Promotional Banners
