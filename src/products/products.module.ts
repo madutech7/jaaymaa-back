@@ -6,9 +6,10 @@ import { Product } from './entities/product.entity';
 import { ProductImage } from './entities/product-image.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { ProductRecommendation } from './entities/product-recommendation.entity';
+import { InventoryLog } from './entities/inventory-log.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ProductImage, ProductVariant, ProductRecommendation])],
+  imports: [TypeOrmModule.forFeature([Product, ProductImage, ProductVariant, ProductRecommendation, InventoryLog])],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],

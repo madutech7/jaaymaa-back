@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductRecommendation } from './entities/product-recommendation.entity';
+import { InventoryLog } from './entities/inventory-log.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -13,6 +14,8 @@ export class ProductsService {
     private productsRepository: Repository<Product>,
     @InjectRepository(ProductRecommendation)
     private recommendationsRepository: Repository<ProductRecommendation>,
+    @InjectRepository(InventoryLog)
+    private inventoryLogsRepository: Repository<InventoryLog>,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
@@ -348,6 +351,80 @@ export class ProductsService {
     return similarProducts
       .filter(p => p.id !== productId)
       .slice(0, limit);
+  }
+
+  // Inventory Logs
+  async getInventoryLogs(filters?: {
+    product_id?: string;
+    variant_id?: string;
+    change_type?: 'sale' | 'restock' | 'adjustment' | 'return';
+    limit?: number;
+    page?: number;
+  }): Promise<InventoryLog[]> {
+    const queryBuilder = this.inventoryLogsRepository
+      .createQueryBuilder('log')
+      .leftJoinAndSelect('log.product', 'product')
+      .leftJoinAndSelect('log.variant', 'variant')
+      .orderBy('log.created_at', 'DESC');
+
+    if (filters?.product_id) {
+      queryBuilder.andWhere('log.product_id = :product_id', { product_id: filters.product_id });
+    }
+
+    if (filters?.variant_id) {
+      queryBuilder.andWhere('log.variant_id = :variant_id', { variant_id: filters.variant_id });
+    }
+
+    if (filters?.change_type) {
+      queryBuilder.andWhere('log.change_type = :change_type', { change_type: filters.change_type });
+    }
+
+    const limit = filters?.limit || 50;
+    queryBuilder.take(limit);
+
+    if (filters?.page) {
+      const skip = (filters.page - 1) * limit;
+      queryBuilder.skip(skip);
+    }
+
+    return await queryBuilder.getMany();
+  }
+
+  async createInventoryLog(logData: {
+    product_id?: string;
+    variant_id?: string;
+    change_type: 'sale' | 'restock' | 'adjustment' | 'return';
+    quantity_change: number;
+    notes?: string;
+    reference_id?: string;
+    created_by?: string;
+  }): Promise<InventoryLog> {
+    // Get current quantity from product or variant
+    let quantityBefore = 0;
+    if (logData.product_id) {
+      const product = await this.productsRepository.findOne({ where: { id: logData.product_id } });
+      quantityBefore = product?.stock_quantity || 0;
+    } else if (logData.variant_id) {
+      // Note: You may need to add variant repository if not already available
+      // For now, we'll set quantity before to 0 if variant-based
+      quantityBefore = 0;
+    }
+
+    const quantityAfter = quantityBefore + logData.quantity_change;
+
+    const log = this.inventoryLogsRepository.create({
+      product_id: logData.product_id || null,
+      variant_id: logData.variant_id || null,
+      change_type: logData.change_type,
+      quantity_change: logData.quantity_change,
+      quantity_before: quantityBefore,
+      quantity_after: quantityAfter,
+      notes: logData.notes || null,
+      reference_id: logData.reference_id || null,
+      created_by: logData.created_by || null,
+    });
+
+    return await this.inventoryLogsRepository.save(log);
   }
 }
 

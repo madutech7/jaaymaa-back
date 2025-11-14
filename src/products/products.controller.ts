@@ -114,6 +114,33 @@ export class ProductsController {
     return this.productsService.findBySlug(slug);
   }
 
+  @Get('inventory-logs')
+  @ApiOperation({ summary: 'Get inventory logs (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiQuery({ name: 'product_id', required: false })
+  @ApiQuery({ name: 'variant_id', required: false })
+  @ApiQuery({ name: 'change_type', required: false, enum: ['sale', 'restock', 'adjustment', 'return'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  getInventoryLogs(
+    @Query('product_id') product_id?: string,
+    @Query('variant_id') variant_id?: string,
+    @Query('change_type') change_type?: 'sale' | 'restock' | 'adjustment' | 'return',
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+  ) {
+    const filters: any = {};
+    if (product_id) filters.product_id = product_id;
+    if (variant_id) filters.variant_id = variant_id;
+    if (change_type) filters.change_type = change_type;
+    if (limit) filters.limit = Number(limit);
+    if (page) filters.page = Number(page);
+
+    return this.productsService.getInventoryLogs(filters);
+  }
+
   @Get(':id/recommendations')
   @ApiOperation({ summary: 'Get product recommendations' })
   @ApiQuery({ name: 'type', required: false, enum: ['similar', 'frequently_bought', 'alternative'] })
@@ -148,6 +175,22 @@ export class ProductsController {
   @ApiBearerAuth()
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
+  }
+
+  @Post('inventory-logs')
+  @ApiOperation({ summary: 'Create inventory log (Admin only)' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  createInventoryLog(@Body() logData: {
+    product_id?: string;
+    variant_id?: string;
+    change_type: 'sale' | 'restock' | 'adjustment' | 'return';
+    quantity_change: number;
+    notes?: string;
+    reference_id?: string;
+  }) {
+    return this.productsService.createInventoryLog(logData);
   }
 }
 
