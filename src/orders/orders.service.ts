@@ -32,30 +32,42 @@ export class OrdersService {
 
     // Envoyer l'email de confirmation de commande avec l'email du client connecté
     try {
-      if (user && user.email) {
-        const userName = user.first_name && user.last_name 
-          ? `${user.first_name} ${user.last_name}` 
-          : user.first_name || user.last_name || undefined;
-        
-        this.logger.log(`Tentative d'envoi d'email à ${user.email} pour la commande ${savedOrder.order_number}`);
-        
-        await this.emailService.sendOrderConfirmation(
-          savedOrder,
-          user.email,
-          userName,
-        );
-        
-        this.logger.log(`✅ Email de confirmation envoyé avec succès à ${user.email} pour la commande ${savedOrder.order_number}`);
-      } else {
-        this.logger.warn(`⚠️ Impossible d'envoyer l'email: utilisateur ${user.id} n'a pas d'email`);
+      if (!user) {
+        this.logger.warn(`⚠️ Impossible d'envoyer l'email: utilisateur non défini`);
+        return savedOrder;
       }
+
+      if (!user.email) {
+        this.logger.warn(`⚠️ Impossible d'envoyer l'email: utilisateur ${user.id} n'a pas d'email`);
+        return savedOrder;
+      }
+
+      const userName = user.first_name && user.last_name 
+        ? `${user.first_name} ${user.last_name}` 
+        : user.first_name || user.last_name || undefined;
+      
+      this.logger.log(`📧 Tentative d'envoi d'email de confirmation à ${user.email} pour la commande ${savedOrder.order_number}`);
+      
+      await this.emailService.sendOrderConfirmation(
+        savedOrder,
+        user.email,
+        userName,
+      );
+      
+      this.logger.log(`✅ Email de confirmation envoyé avec succès à ${user.email} pour la commande ${savedOrder.order_number}`);
     } catch (error) {
       // Ne pas faire échouer la création de commande si l'email échoue
-      this.logger.error(`❌ Erreur lors de l'envoi de l'email de confirmation à ${user.email}:`, error);
+      this.logger.error(`❌ Erreur lors de l'envoi de l'email de confirmation:`, error);
       if (error instanceof Error) {
-        this.logger.error(`Détails de l'erreur: ${error.message}`);
-        this.logger.error(`Stack trace: ${error.stack}`);
+        this.logger.error(`Type: ${error.constructor.name}`);
+        this.logger.error(`Message: ${error.message}`);
+        if (error.stack) {
+          this.logger.error(`Stack: ${error.stack}`);
+        }
+      } else {
+        this.logger.error(`Erreur inconnue:`, JSON.stringify(error));
       }
+      // Ne pas propager l'erreur pour ne pas bloquer la création de commande
     }
 
     return savedOrder;

@@ -10,12 +10,19 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     // Configuration Gmail avec mot de passe d'application
-    const emailUser = this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com';
+    const emailUser = this.configService.get<string>('EMAIL_USER') || 'madutech0@gmail.com';
     const emailPassword = this.configService.get<string>('EMAIL_PASSWORD');
 
     if (!emailPassword) {
       this.logger.warn('⚠️ EMAIL_PASSWORD non configuré dans les variables d\'environnement');
+      this.logger.warn('⚠️ Les emails ne pourront pas être envoyés sans mot de passe d\'application Gmail');
     }
+
+    if (!emailUser) {
+      this.logger.warn('⚠️ EMAIL_USER non configuré dans les variables d\'environnement');
+    }
+
+    this.logger.log(`📧 Configuration email - User: ${emailUser}, Password: ${emailPassword ? '***configuré***' : 'NON CONFIGURÉ'}`);
 
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -25,11 +32,16 @@ export class EmailService {
       },
     });
 
-    // Vérifier la configuration
+    // Vérifier la configuration de manière asynchrone
     this.transporter.verify((error, success) => {
       if (error) {
         this.logger.error('❌ Erreur de configuration email:', error);
+        this.logger.error('Détails de l\'erreur:', error.message);
         this.logger.error('Vérifiez que EMAIL_USER et EMAIL_PASSWORD sont correctement configurés dans .env');
+        if (error.message.includes('Invalid login')) {
+          this.logger.error('💡 Le mot de passe d\'application Gmail est incorrect ou invalide');
+          this.logger.error('💡 Générez un nouveau mot de passe d\'application sur: https://myaccount.google.com/apppasswords');
+        }
       } else {
         this.logger.log(`✅ Configuration email réussie - Envoi depuis: ${emailUser}`);
       }
@@ -187,26 +199,47 @@ L'équipe JAAYMA
       `;
 
       const mailOptions = {
-        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech0@gmail.com'}>`,
         to: userEmail,
         subject: `Confirmation de commande - ${order.order_number}`,
         text: textContent,
         html: htmlContent,
       };
 
-      this.logger.log(`📧 Envoi de l'email de confirmation à ${userEmail}...`);
+      this.logger.log(`📧 Tentative d'envoi d'email de confirmation à ${userEmail}...`);
+      this.logger.debug(`Options email:`, {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+      });
+
+      // Vérifier que le transporter est configuré
+      if (!this.transporter) {
+        throw new Error('Transporter email non initialisé');
+      }
+
       const info = await this.transporter.sendMail(mailOptions);
       this.logger.log(`✅ Email de confirmation envoyé avec succès à ${userEmail} pour la commande ${order.order_number}`);
-      this.logger.debug(`Message ID: ${info.messageId}`);
+      this.logger.log(`Message ID: ${info.messageId}`);
+      this.logger.log(`Réponse du serveur: ${JSON.stringify(info.response)}`);
     } catch (error) {
       this.logger.error(`❌ Erreur lors de l'envoi de l'email de confirmation à ${userEmail}:`, error);
       if (error instanceof Error) {
-        this.logger.error(`Détails: ${error.message}`);
+        this.logger.error(`Type d'erreur: ${error.constructor.name}`);
+        this.logger.error(`Message: ${error.message}`);
+        this.logger.error(`Stack: ${error.stack}`);
+        
         // Erreurs Gmail communes
-        if (error.message.includes('Invalid login')) {
-          this.logger.error('Vérifiez que le mot de passe d\'application Gmail est correct');
-        } else if (error.message.includes('Connection timeout')) {
-          this.logger.error('Problème de connexion réseau ou Gmail bloqué');
+        if (error.message.includes('Invalid login') || error.message.includes('535')) {
+          this.logger.error('🔐 Erreur d\'authentification Gmail');
+          this.logger.error('💡 Vérifiez que le mot de passe d\'application Gmail est correct');
+          this.logger.error('💡 Générez un nouveau mot de passe sur: https://myaccount.google.com/apppasswords');
+        } else if (error.message.includes('Connection timeout') || error.message.includes('ETIMEDOUT')) {
+          this.logger.error('🌐 Problème de connexion réseau ou Gmail bloqué');
+        } else if (error.message.includes('550') || error.message.includes('553')) {
+          this.logger.error('📮 Erreur de boîte mail - adresse invalide ou rejetée');
+        } else if (error.message.includes('ECONNREFUSED')) {
+          this.logger.error('🔌 Connexion refusée - vérifiez votre connexion internet');
         }
       }
       // Ne pas faire échouer la création de commande si l'email échoue
@@ -325,7 +358,7 @@ L'équipe JAAYMA
       `;
 
       const mailOptions = {
-        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech0@gmail.com'}>`,
         to: userEmail,
         subject: `Mise à jour de commande - ${order.order_number} : ${statusLabel}`,
         text: textContent,
@@ -453,7 +486,7 @@ L'équipe JAAYMA
       `;
 
       const mailOptions = {
-        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech0@gmail.com'}>`,
         to: userEmail,
         subject: `Mise à jour du paiement - ${order.order_number} : ${paymentStatusLabel}`,
         text: textContent,
@@ -475,7 +508,7 @@ L'équipe JAAYMA
   async sendEmail(to: string, subject: string, html: string, text?: string): Promise<void> {
     try {
       const mailOptions = {
-        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech0@gmail.com'}>`,
         to,
         subject,
         text: text || html.replace(/<[^>]*>/g, ''),
