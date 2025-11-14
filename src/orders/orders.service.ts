@@ -103,8 +103,50 @@ export class OrdersService {
 
   async update(id: string, updateOrderDto: UpdateOrderDto): Promise<Order> {
     const order = await this.findOne(id);
+    const oldStatus = order.status;
+    const oldPaymentStatus = order.payment_status;
+    
     Object.assign(order, updateOrderDto);
-    return await this.ordersRepository.save(order);
+    const savedOrder = await this.ordersRepository.save(order);
+
+    // Envoyer des emails si le statut ou le statut de paiement a changé
+    try {
+      if (order.user_id && (oldStatus !== savedOrder.status || oldPaymentStatus !== savedOrder.payment_status)) {
+        const user = await this.usersService.findOne(order.user_id);
+        if (user && user.email) {
+          const userName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}` 
+            : user.first_name || user.last_name || undefined;
+          
+          // Envoyer l'email de mise à jour de statut si le statut a changé
+          if (oldStatus !== savedOrder.status) {
+            await this.emailService.sendOrderStatusUpdate(
+              savedOrder,
+              user.email,
+              userName,
+              oldStatus,
+            );
+            this.logger.log(`Email de mise à jour de statut envoyé pour la commande ${savedOrder.order_number}`);
+          }
+          
+          // Envoyer l'email de mise à jour de paiement si le statut de paiement a changé
+          if (oldPaymentStatus !== savedOrder.payment_status) {
+            await this.emailService.sendPaymentStatusUpdate(
+              savedOrder,
+              user.email,
+              userName,
+              oldPaymentStatus,
+            );
+            this.logger.log(`Email de mise à jour de paiement envoyé pour la commande ${savedOrder.order_number}`);
+          }
+        }
+      }
+    } catch (error) {
+      // Ne pas faire échouer la mise à jour si l'email échoue
+      this.logger.error(`Erreur lors de l'envoi des emails de mise à jour:`, error);
+    }
+
+    return savedOrder;
   }
 
   async updateStatus(
@@ -112,8 +154,34 @@ export class OrdersService {
     status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded',
   ): Promise<Order> {
     const order = await this.findOne(id);
+    const oldStatus = order.status;
     order.status = status;
-    return await this.ordersRepository.save(order);
+    const savedOrder = await this.ordersRepository.save(order);
+
+    // Envoyer l'email de notification de changement de statut
+    try {
+      if (order.user_id) {
+        const user = await this.usersService.findOne(order.user_id);
+        if (user && user.email) {
+          const userName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}` 
+            : user.first_name || user.last_name || undefined;
+          
+          await this.emailService.sendOrderStatusUpdate(
+            savedOrder,
+            user.email,
+            userName,
+            oldStatus,
+          );
+          this.logger.log(`Email de mise à jour de statut envoyé pour la commande ${savedOrder.order_number}`);
+        }
+      }
+    } catch (error) {
+      // Ne pas faire échouer la mise à jour si l'email échoue
+      this.logger.error(`Erreur lors de l'envoi de l'email de mise à jour de statut:`, error);
+    }
+
+    return savedOrder;
   }
 
   async updatePaymentStatus(
@@ -121,8 +189,34 @@ export class OrdersService {
     paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded',
   ): Promise<Order> {
     const order = await this.findOne(id);
+    const oldPaymentStatus = order.payment_status;
     order.payment_status = paymentStatus;
-    return await this.ordersRepository.save(order);
+    const savedOrder = await this.ordersRepository.save(order);
+
+    // Envoyer l'email de notification de changement de statut de paiement
+    try {
+      if (order.user_id) {
+        const user = await this.usersService.findOne(order.user_id);
+        if (user && user.email) {
+          const userName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}` 
+            : user.first_name || user.last_name || undefined;
+          
+          await this.emailService.sendPaymentStatusUpdate(
+            savedOrder,
+            user.email,
+            userName,
+            oldPaymentStatus,
+          );
+          this.logger.log(`Email de mise à jour de paiement envoyé pour la commande ${savedOrder.order_number}`);
+        }
+      }
+    } catch (error) {
+      // Ne pas faire échouer la mise à jour si l'email échoue
+      this.logger.error(`Erreur lors de l'envoi de l'email de mise à jour de paiement:`, error);
+    }
+
+    return savedOrder;
   }
 
   async validateCashPayment(id: string): Promise<Order> {
@@ -138,6 +232,9 @@ export class OrdersService {
       throw new Error('Ce paiement a déjà été validé');
     }
     
+    const oldPaymentStatus = order.payment_status;
+    const oldStatus = order.status;
+    
     // Valider le paiement
     order.payment_status = 'paid';
     
@@ -146,7 +243,44 @@ export class OrdersService {
       order.status = 'processing';
     }
     
-    return await this.ordersRepository.save(order);
+    const savedOrder = await this.ordersRepository.save(order);
+
+    // Envoyer l'email de notification de validation de paiement
+    try {
+      if (order.user_id) {
+        const user = await this.usersService.findOne(order.user_id);
+        if (user && user.email) {
+          const userName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}` 
+            : user.first_name || user.last_name || undefined;
+          
+          // Envoyer l'email de mise à jour de paiement
+          await this.emailService.sendPaymentStatusUpdate(
+            savedOrder,
+            user.email,
+            userName,
+            oldPaymentStatus,
+          );
+          
+          // Si le statut a aussi changé, envoyer aussi l'email de mise à jour de statut
+          if (oldStatus !== savedOrder.status) {
+            await this.emailService.sendOrderStatusUpdate(
+              savedOrder,
+              user.email,
+              userName,
+              oldStatus,
+            );
+          }
+          
+          this.logger.log(`Email de validation de paiement envoyé pour la commande ${savedOrder.order_number}`);
+        }
+      }
+    } catch (error) {
+      // Ne pas faire échouer la validation si l'email échoue
+      this.logger.error(`Erreur lors de l'envoi de l'email de validation de paiement:`, error);
+    }
+    
+    return savedOrder;
   }
 
   async remove(id: string): Promise<void> {

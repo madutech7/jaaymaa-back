@@ -25,6 +25,27 @@ export class PaymentsService {
     });
   }
 
+  async updateTransactionStatus(
+    transactionId: string,
+    status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded',
+    errorMessage?: string,
+  ): Promise<PaymentTransaction> {
+    const transaction = await this.transactionsRepository.findOne({
+      where: { transaction_id: transactionId },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction with ID ${transactionId} not found`);
+    }
+
+    transaction.status = status;
+    if (errorMessage) {
+      transaction.error_message = errorMessage;
+    }
+
+    return await this.transactionsRepository.save(transaction);
+  }
+
   async requestRefund(data: Partial<Refund>): Promise<Refund> {
     const refund = this.refundsRepository.create({
       ...data,

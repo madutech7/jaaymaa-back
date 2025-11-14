@@ -197,6 +197,261 @@ L'équipe JAAYMA
   }
 
   /**
+   * Envoie un email de notification de changement de statut de commande
+   */
+  async sendOrderStatusUpdate(
+    order: Order,
+    userEmail: string,
+    userName?: string,
+    oldStatus?: string,
+  ): Promise<void> {
+    try {
+      const statusLabel = this.getStatusLabel(order.status);
+      const oldStatusLabel = oldStatus ? this.getStatusLabel(oldStatus) : null;
+
+      // Couleur selon le statut
+      const statusColors: { [key: string]: string } = {
+        pending: '#FF9800',
+        processing: '#2196F3',
+        shipped: '#9C27B0',
+        delivered: '#4CAF50',
+        cancelled: '#F44336',
+        refunded: '#607D8B',
+      };
+
+      const statusColor = statusColors[order.status] || '#333';
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: ${statusColor}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+    .status-box { background-color: white; padding: 20px; margin: 15px 0; border-radius: 5px; border-left: 4px solid ${statusColor}; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    .status-badge { display: inline-block; padding: 8px 16px; background-color: ${statusColor}; color: white; border-radius: 4px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📦 Mise à jour de votre commande</h1>
+    </div>
+    <div class="content">
+      <p>Bonjour ${userName || 'Cher client'},</p>
+      
+      <p>Nous vous informons que le statut de votre commande a été mis à jour.</p>
+      
+      <div class="status-box">
+        <h2>Détails de la commande</h2>
+        <p><strong>Numéro de commande:</strong> ${order.order_number}</p>
+        ${oldStatusLabel ? `<p><strong>Ancien statut:</strong> ${oldStatusLabel}</p>` : ''}
+        <p><strong>Nouveau statut:</strong> <span class="status-badge">${statusLabel}</span></p>
+        ${order.tracking_number ? `<p><strong>Numéro de suivi:</strong> ${order.tracking_number}</p>` : ''}
+      </div>
+
+      ${order.status === 'shipped' ? `
+      <div class="status-box">
+        <h3>🚚 Votre commande a été expédiée !</h3>
+        <p>Votre commande est en route. Vous recevrez bientôt votre colis.</p>
+        ${order.tracking_number ? `<p>Vous pouvez suivre votre colis avec le numéro de suivi: <strong>${order.tracking_number}</strong></p>` : ''}
+      </div>
+      ` : ''}
+
+      ${order.status === 'delivered' ? `
+      <div class="status-box">
+        <h3>✅ Votre commande a été livrée !</h3>
+        <p>Nous espérons que vous êtes satisfait de votre achat. N'hésitez pas à nous laisser un avis !</p>
+      </div>
+      ` : ''}
+
+      ${order.status === 'cancelled' ? `
+      <div class="status-box">
+        <h3>❌ Commande annulée</h3>
+        <p>Votre commande a été annulée. Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+      </div>
+      ` : ''}
+
+      <p>Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter.</p>
+      
+      <p>Cordialement,<br>L'équipe JAAYMA</p>
+    </div>
+    
+    <div class="footer">
+      <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const textContent = `
+Mise à jour de votre commande
+
+Bonjour ${userName || 'Cher client'},
+
+Nous vous informons que le statut de votre commande a été mis à jour.
+
+Numéro de commande: ${order.order_number}
+${oldStatusLabel ? `Ancien statut: ${oldStatusLabel}\n` : ''}Nouveau statut: ${statusLabel}
+${order.tracking_number ? `Numéro de suivi: ${order.tracking_number}\n` : ''}
+
+Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter.
+
+Cordialement,
+L'équipe JAAYMA
+      `;
+
+      const mailOptions = {
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        to: userEmail,
+        subject: `Mise à jour de commande - ${order.order_number} : ${statusLabel}`,
+        text: textContent,
+        html: htmlContent,
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Email de mise à jour de statut envoyé à ${userEmail} pour la commande ${order.order_number}`);
+      this.logger.debug(`Message ID: ${info.messageId}`);
+    } catch (error) {
+      this.logger.error(`Erreur lors de l'envoi de l'email de mise à jour de statut:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Envoie un email de notification de changement de statut de paiement
+   */
+  async sendPaymentStatusUpdate(
+    order: Order,
+    userEmail: string,
+    userName?: string,
+    oldPaymentStatus?: string,
+  ): Promise<void> {
+    try {
+      const paymentStatusLabel = this.getPaymentStatusLabel(order.payment_status);
+      const oldPaymentStatusLabel = oldPaymentStatus ? this.getPaymentStatusLabel(oldPaymentStatus) : null;
+
+      // Couleur selon le statut de paiement
+      const paymentColors: { [key: string]: string } = {
+        pending: '#FF9800',
+        paid: '#4CAF50',
+        failed: '#F44336',
+        refunded: '#607D8B',
+      };
+
+      const paymentColor = paymentColors[order.payment_status] || '#333';
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: ${paymentColor}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+    .payment-box { background-color: white; padding: 20px; margin: 15px 0; border-radius: 5px; border-left: 4px solid ${paymentColor}; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    .status-badge { display: inline-block; padding: 8px 16px; background-color: ${paymentColor}; color: white; border-radius: 4px; font-weight: bold; }
+    .amount { font-size: 24px; font-weight: bold; color: ${paymentColor}; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💳 Mise à jour du paiement</h1>
+    </div>
+    <div class="content">
+      <p>Bonjour ${userName || 'Cher client'},</p>
+      
+      <p>Nous vous informons que le statut du paiement de votre commande a été mis à jour.</p>
+      
+      <div class="payment-box">
+        <h2>Détails de la commande</h2>
+        <p><strong>Numéro de commande:</strong> ${order.order_number}</p>
+        <p><strong>Montant:</strong> <span class="amount">${order.total.toFixed(2)} €</span></p>
+        ${oldPaymentStatusLabel ? `<p><strong>Ancien statut:</strong> ${oldPaymentStatusLabel}</p>` : ''}
+        <p><strong>Nouveau statut:</strong> <span class="status-badge">${paymentStatusLabel}</span></p>
+        <p><strong>Méthode de paiement:</strong> ${this.getPaymentMethodLabel(order.payment_method)}</p>
+      </div>
+
+      ${order.payment_status === 'paid' ? `
+      <div class="payment-box">
+        <h3>✅ Paiement confirmé</h3>
+        <p>Votre paiement a été confirmé avec succès. Votre commande est en cours de traitement.</p>
+      </div>
+      ` : ''}
+
+      ${order.payment_status === 'failed' ? `
+      <div class="payment-box">
+        <h3>❌ Échec du paiement</h3>
+        <p>Le paiement de votre commande a échoué. Veuillez vérifier vos informations de paiement ou contacter votre banque.</p>
+        <p>Si le problème persiste, n'hésitez pas à nous contacter pour obtenir de l'aide.</p>
+      </div>
+      ` : ''}
+
+      ${order.payment_status === 'refunded' ? `
+      <div class="payment-box">
+        <h3>💰 Remboursement effectué</h3>
+        <p>Votre remboursement a été effectué. Le montant devrait apparaître sur votre compte dans les prochains jours.</p>
+      </div>
+      ` : ''}
+
+      <p>Si vous avez des questions concernant votre paiement, n'hésitez pas à nous contacter.</p>
+      
+      <p>Cordialement,<br>L'équipe JAAYMA</p>
+    </div>
+    
+    <div class="footer">
+      <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const textContent = `
+Mise à jour du paiement
+
+Bonjour ${userName || 'Cher client'},
+
+Nous vous informons que le statut du paiement de votre commande a été mis à jour.
+
+Numéro de commande: ${order.order_number}
+Montant: ${order.total.toFixed(2)} €
+${oldPaymentStatusLabel ? `Ancien statut: ${oldPaymentStatusLabel}\n` : ''}Nouveau statut: ${paymentStatusLabel}
+Méthode de paiement: ${this.getPaymentMethodLabel(order.payment_method)}
+
+Si vous avez des questions concernant votre paiement, n'hésitez pas à nous contacter.
+
+Cordialement,
+L'équipe JAAYMA
+      `;
+
+      const mailOptions = {
+        from: `"JAAYMA" <${this.configService.get<string>('EMAIL_USER') || 'madutech@gmail.com'}>`,
+        to: userEmail,
+        subject: `Mise à jour du paiement - ${order.order_number} : ${paymentStatusLabel}`,
+        text: textContent,
+        html: htmlContent,
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Email de mise à jour de paiement envoyé à ${userEmail} pour la commande ${order.order_number}`);
+      this.logger.debug(`Message ID: ${info.messageId}`);
+    } catch (error) {
+      this.logger.error(`Erreur lors de l'envoi de l'email de mise à jour de paiement:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Envoie un email générique
    */
   async sendEmail(to: string, subject: string, html: string, text?: string): Promise<void> {
