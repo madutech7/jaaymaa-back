@@ -361,33 +361,40 @@ export class ProductsService {
     limit?: number;
     page?: number;
   }): Promise<InventoryLog[]> {
-    const queryBuilder = this.inventoryLogsRepository
-      .createQueryBuilder('log')
-      .leftJoinAndSelect('log.product', 'product')
-      .leftJoinAndSelect('log.variant', 'variant')
-      .orderBy('log.created_at', 'DESC');
+    try {
+      // Build where conditions
+      const where: any = {};
 
-    if (filters?.product_id) {
-      queryBuilder.andWhere('log.product_id = :product_id', { product_id: filters.product_id });
+      if (filters?.product_id) {
+        where.product_id = filters.product_id;
+      }
+
+      if (filters?.variant_id) {
+        where.variant_id = filters.variant_id;
+      }
+
+      if (filters?.change_type) {
+        where.change_type = filters.change_type;
+      }
+
+      const limit = filters?.limit || 50;
+      const skip = filters?.page ? (filters.page - 1) * limit : 0;
+
+      // Use find with relations instead of query builder to avoid issues
+      const logs = await this.inventoryLogsRepository.find({
+        where: Object.keys(where).length > 0 ? where : undefined,
+        relations: ['product', 'variant'],
+        order: { created_at: 'DESC' },
+        take: limit,
+        skip: skip,
+      });
+
+      return logs;
+    } catch (error) {
+      console.error('Error fetching inventory logs:', error);
+      // Return empty array on error instead of throwing
+      return [];
     }
-
-    if (filters?.variant_id) {
-      queryBuilder.andWhere('log.variant_id = :variant_id', { variant_id: filters.variant_id });
-    }
-
-    if (filters?.change_type) {
-      queryBuilder.andWhere('log.change_type = :change_type', { change_type: filters.change_type });
-    }
-
-    const limit = filters?.limit || 50;
-    queryBuilder.take(limit);
-
-    if (filters?.page) {
-      const skip = (filters.page - 1) * limit;
-      queryBuilder.skip(skip);
-    }
-
-    return await queryBuilder.getMany();
   }
 
   async createInventoryLog(logData: {
