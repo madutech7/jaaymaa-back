@@ -380,14 +380,18 @@ export class ProductsService {
       const limit = filters?.limit || 50;
       const skip = filters?.page ? (filters.page - 1) * limit : 0;
 
-      // Use find with relations instead of query builder to avoid issues
-      const logs = await this.inventoryLogsRepository.find({
+      // Use find without relations to avoid issues with nullable foreign keys
+      // Relations can cause errors when foreign keys are null
+      const findOptions: any = {
         where: Object.keys(where).length > 0 ? where : undefined,
-        relations: ['product', 'variant'],
         order: { created_at: 'DESC' },
         take: limit,
         skip: skip,
-      });
+      };
+
+      // Don't load relations for now to avoid issues with nullable foreign keys
+      // The frontend can handle the data without relations
+      const logs = await this.inventoryLogsRepository.find(findOptions);
 
       return logs;
     } catch (error) {
